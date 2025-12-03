@@ -1,5 +1,5 @@
 # Commented out IPython magic to ensure Python compatibility.
-%pip install tabulate numpy pandas matplotlib seaborn scikit-learn scipy -q
+# %pip install tabulate numpy pandas matplotlib seaborn scikit-learn scipy -q
 
 """## Library yang Digunakan"""
 

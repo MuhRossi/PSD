@@ -1,5 +1,5 @@
 # Commented out IPython magic to ensure Python compatibility.
-# %pip install tabulate numpy pandas matplotlib seaborn scikit-learn scipy -q
+%pip install tabulate numpy pandas matplotlib seaborn scikit-learn scipy -q
 
 """## Library yang Digunakan"""
 
@@ -91,72 +91,66 @@ if 'target' in df_cleaned.columns:
 else:
     print("Kolom 'target' tidak ditemukan di df_cleaned.")
 
-st.header("Normalisasi Data Menggunakan Z-Score")
+"""## Normalisasi data menggunakan Z-Score
 
-st.markdown("""
-Z-Score adalah metode normalisasi untuk mengubah data sehingga memiliki:
+Z-Score (atau standar skor) adalah metode untuk menormalisasi data numerik agar memiliki:
 
-- Mean = 0  
-- Standar deviasi = 1  
-
-Rumus umum Z-Score:
-""")
-
-st.latex(r"Z = \frac{X - \mu}{\sigma}")
-
-st.markdown("""
-### Contoh Perhitungan Manual
-
-Misalkan data kolom **age** dari 5 pasien:
-""")
-
-st.table({
-    "No": [1, 2, 3, 4, 5],
-    "Age": [63, 59, 55, 54, 65]
-})
-
-st.subheader("1. Hitung Rata-rata (Mean)")
-
-st.latex(r"""
-\mu = \frac{63 + 59 + 55 + 54 + 65}{5} 
-= \frac{296}{5} 
-= 59.2
-""")
-
-st.subheader("2. Hitung Standar Deviasi (σ)")
-
-st.latex(r"""
-\sigma = \sqrt{
-\frac{
-(63 - 59.2)^2 +
-(59 - 59.2)^2 +
-(55 - 59.2)^2 +
-(54 - 59.2)^2 +
-(65 - 59.2)^2
-}{5}
-}
-\approx 4.21
-""")
-
-st.subheader("3. Hitung Z-Score Masing-masing Nilai")
-
-st.markdown("Contoh untuk data pertama (age = 63):")
-
-st.latex(r"""
-Z = \frac{63 - 59.2}{4.21}
-= \frac{3.8}{4.21}
-\approx 0.90
-""")
-
-st.markdown("Contoh untuk data kedua (age = 59):")
-
-st.latex(r"""
-Z = \frac{59 - 59.2}{4.21}
-= \frac{-0.2}{4.21}
-\approx -0.05
-""")
+* Rata-rata (mean) = 0
+* Standar deviasi (std) = 1
 
 
+## Rumus Z-Score
+
+$$
+Z = \frac{X - \mu}{\sigma}
+$$
+
+Keterangan:
+
+* $X$: Nilai asli
+* $\mu$: Rata-rata (mean) dari kolom tersebut
+* $\sigma$: Standar deviasi dari kolom tersebut
+* $Z$: Nilai yang sudah dinormalisasi (Z-Score)
+
+---
+
+## Contoh Perhitungan Manual
+
+Misalkan kita punya data kolom `age` dari 5 pasien:
+
+| No | Age |
+| -- | --- |
+| 1  | 63  |
+| 2  | 59  |
+| 3  | 55  |
+| 4  | 54  |
+| 5  | 65  |
+
+### 1. Hitung Rata-rata (Mean)
+
+$$
+\mu = \frac{63 + 59 + 55 + 54 + 65}{5} = \frac{296}{5} = 59.2
+$$
+
+### 2. Hitung Standar Deviasi (σ)
+
+$$
+\sigma = \sqrt{\frac{(63 - 59.2)^2 + (59 - 59.2)^2 + \dots + (65 - 59.2)^2}{5}} = \sqrt{\frac{88.8}{5}} \approx 4.21
+$$
+
+### 3. Hitung Z-Score Masing-masing Nilai
+
+Contoh untuk data pertama (`age = 63`):
+
+$$
+Z = \frac{63 - 59.2}{4.21} = \frac{3.8}{4.21} \approx 0.90
+$$
+
+Data kedua (`age = 59`):
+
+$$
+Z = \frac{59 - 59.2}{4.21} = \frac{-0.2}{4.21} \approx -0.05
+$$
 
 ## Tujuan Penggunaan Z-Score:
 

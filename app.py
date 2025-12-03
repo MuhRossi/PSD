@@ -176,3 +176,86 @@ joblib.dump(svm_model, "models/model_svm_heart.joblib")
 joblib.dump(rf_model, "models/model_rf_heart.joblib")
 
 st.success("Model berhasil disimpan ke folder /models/")
+
+
+# ============================================================
+# 9. FITUR PREDIKSI
+# ============================================================
+st.header("🩺 9. Prediksi Penyakit Jantung dari Input Manual")
+
+st.markdown("""
+Masukkan data pasien di bawah ini untuk memprediksi apakah pasien **berisiko** atau **tidak berisiko**
+mengalami penyakit jantung.
+""")
+
+# ------------------------------
+# FORM INPUT USER
+# ------------------------------
+age = st.number_input("Umur", min_value=1, max_value=120, value=50)
+sex = st.selectbox("Jenis Kelamin", ["Laki-laki", "Perempuan"])
+cp = st.selectbox("Tipe Nyeri Dada (0–3)", [0, 1, 2, 3])
+trestbps = st.number_input("Tekanan Darah (mmHg)", 80, 200, 120)
+chol = st.number_input("Kolesterol (mg/dl)", 100, 600, 200)
+fbs = st.selectbox("Gula Darah > 120 mg/dl", [0, 1])
+restecg = st.selectbox("Hasil ECG (0–2)", [0, 1, 2])
+thalach = st.number_input("Denyut Jantung Maksimum", 60, 220, 150)
+exang = st.selectbox("Angina karena olahraga", [0, 1])
+oldpeak = st.number_input("ST Depression", 0.0, 10.0, 1.0, step=0.1)
+slope = st.selectbox("Slope ST (0–2)", [0, 1, 2])
+ca = st.selectbox("Jumlah pembuluh besar (0–4)", [0, 1, 2, 3, 4])
+thal = st.selectbox("Thalassemia (0–3)", [0, 1, 2, 3])
+
+# Convert gender
+sex_val = 1 if sex == "Laki-laki" else 0
+
+# ------------------------------
+# Input disatukan dalam array
+# ------------------------------
+input_data = np.array([
+    age, sex_val, cp, trestbps, chol, fbs, restecg, thalach,
+    exang, oldpeak, slope, ca, thal
+]).reshape(1, -1)
+
+# ------------------------------
+# Pilih model
+# ------------------------------
+st.subheader("Pilih Model Prediksi")
+model_choice = st.selectbox(
+    "Model yang digunakan:",
+    ["ELM", "SVM", "Random Forest"]
+)
+
+# Load model ketika user menekan tombol
+if st.button("🔮 Prediksi Sekarang"):
+    
+    # Normalize input
+    scaler_loaded = joblib.load("models/scaler_heart.joblib")
+    input_scaled = scaler_loaded.transform(input_data)
+
+    if model_choice == "ELM":
+        encoder_loaded = joblib.load("models/encoder_elm_heart.joblib")
+        model = joblib.load("models/model_elm_heart.joblib")
+        pred = model.predict(input_scaled)
+
+    elif model_choice == "SVM":
+        model = joblib.load("models/model_svm_heart.joblib")
+        pred = model.predict(input_scaled)
+
+    elif model_choice == "Random Forest":
+        model = joblib.load("models/model_rf_heart.joblib")
+        pred = model.predict(input_scaled)
+
+    # ------------------------------
+    # Hasil Prediksi
+    # ------------------------------
+    result = int(pred[0])
+
+    st.subheader("🧾 Hasil Prediksi")
+
+    if result == 0:
+        st.success("✅ **Tidak Berisiko Penyakit Jantung**")
+    else:
+        st.error("⚠ **Berisiko Penyakit Jantung**")
+
+    st.info(f"Model yang digunakan: **{model_choice}**")
+

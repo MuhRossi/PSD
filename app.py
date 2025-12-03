@@ -1,459 +1,198 @@
-# Commented out IPython magic to ensure Python compatibility.
-# %pip install tabulate numpy pandas matplotlib seaborn scikit-learn scipy -q
-
-"""## Library yang Digunakan"""
-
+import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import streamlit as st
-from tabulate import tabulate
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import OneHotEncoder
+import joblib
+import os
+
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-from scipy.special import expit as sigmoid
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 from scipy.special import expit
 
-"""## Mengambil data dari heart.csv"""
+# ============================================================
+# TITLE
+# ============================================================
+st.title("📊 Prediksi Penyakit Jantung – ELM, SVM, Random Forest")
 
-#  Baca file CSV
-df = pd.read_csv('heart.csv')
-
-#  Tampilkan seluruh data dalam format tabel rapi
-print("===== Tabel Data Penyakit Jantung =====")
-df.head()
-
-"""## Preprocessing Data
-
-### Cek informasi data
-"""
-
-# Tampilkan jumlah data awal
-print(f"Jumlah data awal: {len(df)}")
-
-# Hapus data yang memiliki missing value (NaN) saja
-df_cleaned = df.dropna()
-print(f"\nJumlah data setelah hapus missing value: {len(df_cleaned)}")
-
-# Tampilkan informasi struktur dataset
-print("===== Informasi Dataset =====")
-df_cleaned.info()
-
-# Tampilkan statistik deskriptif
-print("\n===== Statistik Deskriptif =====")
-print(df_cleaned.describe())
-
-# Visualisasi distribusi kolom numerik
-print("\n===== Visualisasi Distribusi Kolom Numerik =====")
-numeric_columns = df_cleaned.select_dtypes(include=['float64', 'int64']).columns
-
-# Tentukan jumlah subplot per baris & baris total
-n_cols = 3
-n_rows = -(-len(numeric_columns) // n_cols)  # ceil division
-
-plt.figure(figsize=(16, 4 * n_rows))
-
-# Loop visualisasi histogram per kolom
-for i, col in enumerate(numeric_columns, 1):
-    plt.subplot(n_rows, n_cols, i)
-    sns.histplot(df_cleaned[col], kde=True, color='skyblue')
-    plt.title(f'Distribusi: {col}')
-    plt.xlabel(col)
-    plt.ylabel('Frekuensi')
-
-plt.tight_layout()
-plt.show()
-
-"""### distribusi kelas target"""
-
-# Cek apakah kolom 'target' ada
-if 'target' in df_cleaned.columns:
-    plt.figure(figsize=(6, 4))
-    sns.countplot(data=df_cleaned, x='target', palette='Set2')
-
-    # Judul dan label
-    plt.title('Distribusi Kelas Target (Penyakit Jantung)')
-    plt.xlabel('Target (0 = Tidak, 1 = Ya)')
-    plt.ylabel('Jumlah')
-
-    # Label sumbu x
-    plt.xticks([0, 1], ['Tidak Ada Penyakit', 'Ada Penyakit'])
-
-    # Tambahkan grid untuk memperjelas
-    plt.grid(axis='y', linestyle='--', alpha=0.5)
-
-    # Tata letak agar tidak terpotong
-    plt.tight_layout()
-    plt.show()
-else:
-    print("Kolom 'target' tidak ditemukan di df_cleaned.")
-
-"""## Normalisasi data menggunakan Z-Score
-
-Z-Score (atau standar skor) adalah metode untuk menormalisasi data numerik agar memiliki:
-
-* Rata-rata (mean) = 0
-* Standar deviasi (std) = 1
-
-
-## Rumus Z-Score
-
-$$
-Z = \frac{X - \mu}{\sigma}
-$$
-
-Keterangan:
-
-* $X$: Nilai asli
-* $\mu$: Rata-rata (mean) dari kolom tersebut
-* $\sigma$: Standar deviasi dari kolom tersebut
-* $Z$: Nilai yang sudah dinormalisasi (Z-Score)
-
----
-
-## Contoh Perhitungan Manual
-
-Misalkan kita punya data kolom `age` dari 5 pasien:
-
-| No | Age |
-| -- | --- |
-| 1  | 63  |
-| 2  | 59  |
-| 3  | 55  |
-| 4  | 54  |
-| 5  | 65  |
-
-### 1. Hitung Rata-rata (Mean)
-
-$$
-\mu = \frac{63 + 59 + 55 + 54 + 65}{5} = \frac{296}{5} = 59.2
-$$
-
-### 2. Hitung Standar Deviasi (σ)
-
-$$
-\sigma = \sqrt{\frac{(63 - 59.2)^2 + (59 - 59.2)^2 + \dots + (65 - 59.2)^2}{5}} = \sqrt{\frac{88.8}{5}} \approx 4.21
-$$
-
-### 3. Hitung Z-Score Masing-masing Nilai
-
-Contoh untuk data pertama (`age = 63`):
-
-$$
-Z = \frac{63 - 59.2}{4.21} = \frac{3.8}{4.21} \approx 0.90
-$$
-
-Data kedua (`age = 59`):
-
-$$
-Z = \frac{59 - 59.2}{4.21} = \frac{-0.2}{4.21} \approx -0.05
-$$
-
-## Tujuan Penggunaan Z-Score:
-
-* Menyamakan skala semua fitur (penting untuk algoritma seperti ELM, SVM, KNN, dll)
-* Menghindari bias terhadap fitur dengan rentang nilai besar
-"""
+st.markdown("""
+Aplikasi ini melakukan:
+- Preprocessing & normalisasi dataset
+- Visualisasi data
+- Perhitungan Z-Score (dengan rumus LaTeX)
+- Pelatihan model ELM, SVM, dan Random Forest
+- Menyimpan model dalam `.joblib`
+""")
 
 # ============================================================
-# 1. Pisahkan fitur (X) dan label (y)
+# LOAD DATASET
 # ============================================================
-X = df_cleaned.drop('target', axis=1)
-y = df_cleaned['target']
+st.header("📥 1. Memuat Dataset `heart.csv`")
+
+df = pd.read_csv("heart.csv")
+st.dataframe(df)
+
+st.write(f"Jumlah data: **{len(df)}**")
 
 # ============================================================
-# 2. Inisialisasi StandardScaler
+# CLEANING
 # ============================================================
-from sklearn.preprocessing import StandardScaler
+st.header("🧹 2. Membersihkan Data Missing Value")
+
+df_clean = df.dropna()
+st.write(f"Jumlah data setelah dihapus missing value: **{len(df_clean)}**")
+
+# ============================================================
+# VISUALISASI DISTRIBUSI NUMERIK
+# ============================================================
+st.header("📈 3. Visualisasi Distribusi Kolom Numerik")
+
+num_cols = df_clean.select_dtypes(include=['int64', 'float64']).columns
+
+fig, ax = plt.subplots(len(num_cols), 1, figsize=(8, 4*len(num_cols)))
+for i, col in enumerate(num_cols):
+    sns.histplot(df_clean[col], kde=True, ax=ax[i])
+    ax[i].set_title(f"Distribusi {col}")
+
+st.pyplot(fig)
+
+# ============================================================
+# DISTRIBUSI TARGET
+# ============================================================
+st.header("🎯 4. Distribusi Kelas Target")
+
+fig2, ax2 = plt.subplots()
+sns.countplot(data=df_clean, x='target', palette='Set2', ax=ax2)
+st.pyplot(fig2)
+
+# ============================================================
+# Z-SCORE EXPLANATION
+# ============================================================
+st.header("📘 5. Penjelasan Z-Score dengan Rumus")
+
+st.markdown("""
+### Rumus Z-Score
+""")
+st.latex(r"Z = \frac{X - \mu}{\sigma}")
+
+st.markdown("### Contoh Perhitungan Mean:")
+st.latex(r"""
+\mu = \frac{63 + 59 + 55 + 54 + 65}{5}
+= \frac{296}{5}
+= 59.2
+""")
+
+st.markdown("### Contoh Standar Deviasi:")
+st.latex(r"""
+\sigma = \sqrt{
+\frac{(63-59.2)^2 + (59-59.2)^2 + (55-59.2)^2 + (54-59.2)^2 + (65-59.2)^2}{5}
+}
+\approx 4.21
+""")
+
+st.markdown("### Contoh Z-Score:")
+st.latex(r"""
+Z = \frac{63 - 59.2}{4.21} \approx 0.90
+""")
+
+# ============================================================
+# NORMALISASI Z-SCORE
+# ============================================================
+st.header("⚙ 6. Normalisasi Z-Score")
+
+X = df_clean.drop("target", axis=1)
+y = df_clean["target"]
+
 scaler = StandardScaler()
-
-# ============================================================
-# 3. Lakukan normalisasi Z-Score
-# ============================================================
 X_scaled = scaler.fit_transform(X)
 
-# ============================================================
-# 4. Buat ulang DataFrame hasil normalisasi
-# ============================================================
-import pandas as pd
-X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)
+st.write("Contoh sebelum normalisasi:")
+st.dataframe(X.head())
 
-print("===== 5 Data Pertama Setelah Normalisasi Z-Score =====")
-print(X_scaled_df.head())
+st.write("Contoh setelah normalisasi:")
+st.dataframe(pd.DataFrame(X_scaled, columns=X.columns).head())
 
 # ============================================================
-# 5. Visualisasi Sebelum dan Sesudah Normalisasi
+# SPLIT DATA
 # ============================================================
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-plt.figure(figsize=(15, 6))
-plt.subplot(1, 2, 1)
-sns.boxplot(data=X, color='lightgray')
-plt.title("Sebelum Normalisasi (Z-Score)")
-plt.xticks(rotation=45)
-
-plt.subplot(1, 2, 2)
-sns.boxplot(data=X_scaled_df, color='skyblue')
-plt.title("Sesudah Normalisasi (Z-Score)")
-plt.xticks(rotation=45)
-
-plt.tight_layout()
-plt.show()
-
-"""### Pembagian Data"""
-
-# ============================================================
-# 1. Gunakan data yang sudah dinormalisasi sebagai fitur
-# ============================================================
-X = X_scaled_df        # fitur (sudah dinormalisasi)
-y = df_cleaned['target']  # label
-
-# ============================================================
-# 2. Bagi data menjadi 70% training dan 30% testing
-# ============================================================
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y,
-    test_size=0.3,
-    random_state=42,
-    stratify=y  # menjaga proporsi kelas tetap seimbang
-)
-
-# ============================================================
-# 3. Tampilkan ringkasan hasil pembagian
-# ============================================================
-print("===== Pembagian Data =====")
-print(f"Jumlah data total   : {len(X)}")
-print(f"Jumlah data training: {len(X_train)}")
-print(f"Jumlah data testing : {len(X_test)}")
-
-"""### MODELING ELM"""
-
-import numpy as np, random, os
-seed = 42
-np.random.seed(seed)
-random.seed(seed)
-os.environ['PYTHONHASHSEED'] = str(seed)
-# ============================================================
-# 1. Pembagian Data 70% Training dan 30% Testing
-# ============================================================
-from sklearn.model_selection import train_test_split
+st.header("✂ 7. Pembagian Data Training & Testing")
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X_scaled, y, test_size=0.3, random_state=seed
+    X_scaled, y, test_size=0.3, random_state=42
 )
 
-# ============================================================
-# 2. One-Hot Encoding untuk label
-# ============================================================
-from sklearn.preprocessing import OneHotEncoder
-
-encoder = OneHotEncoder(sparse_output=False)
-y_train_oh = encoder.fit_transform(y_train.to_numpy().reshape(-1, 1))
-y_test_oh = encoder.transform(y_test.to_numpy().reshape(-1, 1))
+st.write(f"Training: **{len(X_train)}** data")
+st.write(f"Testing: **{len(X_test)}** data")
 
 # ============================================================
-# 3. Fungsi aktivasi sigmoid
+# ELM Classifier
 # ============================================================
-import numpy as np
+st.header("🤖 8. Training Model ELM")
 
 def sigmoid_activation(x):
     return 1 / (1 + np.exp(-x))
 
-# ============================================================
-# 4. Kelas ELM
-# ============================================================
 class ELMClassifier:
-    def __init__(self, input_size, hidden_size, activation=sigmoid_activation, random_state=None):
-        self.input_size = input_size
-        self.hidden_size = hidden_size
+    def __init__(self, input_size, hidden_size, activation=sigmoid_activation, random_state=42):
+        np.random.seed(random_state)
+        self.input_weights = np.random.randn(input_size, hidden_size)
+        self.bias = np.random.randn(hidden_size)
         self.activation = activation
-        self.random_state = random_state
-
-        if self.random_state is not None:
-           np.random.seed(self.random_state)
-
-        self.input_weights = np.random.randn(self.input_size, self.hidden_size)
-        self.bias = np.random.randn(self.hidden_size)
 
     def fit(self, X, y):
-        H = self.activation(np.dot(X, self.input_weights) + self.bias)
-        self.output_weights = np.dot(np.linalg.pinv(H), y)
+        H = self.activation(X @ self.input_weights + self.bias)
+        self.output_weights = np.linalg.pinv(H) @ y
 
     def predict(self, X):
-        H = self.activation(np.dot(X, self.input_weights) + self.bias)
-        output = np.dot(H, self.output_weights)
+        H = self.activation(X @ self.input_weights + self.bias)
+        output = H @ self.output_weights
         return np.argmax(output, axis=1)
 
-# ============================================================
-# 5. Inisialisasi dan Latih Model ELM
-# ============================================================
-elm = ELMClassifier(input_size=X_train.shape[1], hidden_size=150, random_state=seed)
+# One-hot untuk ELM
+encoder = OneHotEncoder(sparse_output=False)
+y_train_oh = encoder.fit_transform(y_train.values.reshape(-1, 1))
+
+# Train ELM
+elm = ELMClassifier(input_size=X_train.shape[1], hidden_size=150)
 elm.fit(X_train, y_train_oh)
+y_pred_elm = elm.predict(X_test)
+
+st.write("**Akurasi ELM:**", accuracy_score(y_test, y_pred_elm))
 
 # ============================================================
-# 6. Prediksi pada Data Testing
+# SVM
 # ============================================================
-y_pred = elm.predict(X_test)
+st.header("🤖 9. Training Model SVM")
 
-# ============================================================
-# 7. Evaluasi Hasil
-# ============================================================
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-
-print("\n===== Hasil Evaluasi Model ELM =====")
-print(f"Akurasi: {accuracy_score(y_test, y_pred):.4f}")
-
-cm = confusion_matrix(y_test, y_pred)
-print("\n===== Confusion Matrix =====")
-print(cm)
-
-print("\nKlasifikasi Report:\n", classification_report(y_test, y_pred))
-
-# ============================================================
-# 8. Visualisasi Confusion Matrix
-# ============================================================
-cm = confusion_matrix(y_test, y_pred)
-
-plt.figure(figsize=(6, 4))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-            xticklabels=encoder.categories_[0],
-            yticklabels=encoder.categories_[0])
-plt.title("Confusion Matrix - ELM")
-plt.xlabel("Prediksi")
-plt.ylabel("Aktual")
-plt.tight_layout()
-plt.show()
-
-# ============================================================
-# MODELING SVM
-# ============================================================
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-# 1. Inisialisasi model SVM
-svm_model = SVC(kernel='rbf', random_state=seed)
-
-# 2. Latih model
-svm_model.fit(X_train, y_train.values.ravel())
-
-# 3. Prediksi data testing
+svm_model = SVC(kernel='rbf')
+svm_model.fit(X_train, y_train)
 y_pred_svm = svm_model.predict(X_test)
 
-# 4. Evaluasi hasil
-print("\n===== Hasil Evaluasi Model SVM =====")
-print(f"Akurasi: {accuracy_score(y_test, y_pred_svm):.4f}")
-
-cm_svm = confusion_matrix(y_test, y_pred_svm)
-print("\n===== Confusion Matrix =====")
-print(cm_svm)
-
-print("\nKlasifikasi Report:\n", classification_report(y_test, y_pred_svm))
-
-# 5. Visualisasi Confusion Matrix
-plt.figure(figsize=(6, 4))
-sns.heatmap(cm_svm, annot=True, fmt='d', cmap='Purples')
-plt.title("Confusion Matrix - SVM")
-plt.xlabel("Prediksi")
-plt.ylabel("Aktual")
-plt.tight_layout()
-plt.show()
+st.write("**Akurasi SVM:**", accuracy_score(y_test, y_pred_svm))
 
 # ============================================================
-# MODELING RANDOM FOREST
+# RANDOM FOREST
 # ============================================================
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import seaborn as sns
-import matplotlib.pyplot as plt
+st.header("🌲 10. Training Model Random Forest")
 
-# 1. Inisialisasi model Random Forest
-rf_model = RandomForestClassifier(n_estimators=100, random_state=seed)
-
-# 2. Latih model
-rf_model.fit(X_train, y_train.values.ravel())
-
-# 3. Prediksi data testing
+rf_model = RandomForestClassifier(n_estimators=120)
+rf_model.fit(X_train, y_train)
 y_pred_rf = rf_model.predict(X_test)
 
-# 4. Evaluasi hasil
-print("\n===== Hasil Evaluasi Model Random Forest =====")
-print(f"Akurasi: {accuracy_score(y_test, y_pred_rf):.4f}")
+st.write("**Akurasi Random Forest:**", accuracy_score(y_test, y_pred_rf))
 
-cm_rf = confusion_matrix(y_test, y_pred_rf)
-print("\n===== Confusion Matrix =====")
-print(cm_rf)
+# ============================================================
+# SAVE MODELS
+# ============================================================
+st.header("💾 11. Menyimpan Model")
 
-print("\nKlasifikasi Report:\n", classification_report(y_test, y_pred_rf))
+joblib.dump(scaler, "scaler_heart.joblib")
+joblib.dump(elm, "model_elm_heart.joblib")
+joblib.dump(encoder, "encoder_elm_heart.joblib")
+joblib.dump(svm_model, "model_svm_heart.joblib")
+joblib.dump(rf_model, "model_rf_heart.joblib")
 
-# 5. Visualisasi Confusion Matrix
-plt.figure(figsize=(6, 4))
-sns.heatmap(cm_rf, annot=True, fmt='d', cmap='Greens')
-plt.title("Confusion Matrix - Random Forest")
-plt.xlabel("Prediksi")
-plt.ylabel("Aktual")
-plt.tight_layout()
-plt.show()
-
-import joblib
-from sklearn.preprocessing import StandardScaler
-
-# Misalnya kamu pakai ini sebelumnya untuk normalisasi
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-
-# Simpan scaler
-joblib.dump(scaler, "scaler_elm_heart.joblib")
-print("Scaler berhasil disimpan!")
-
-import joblib
-
-
-# Simpan model dan encoder
-joblib.dump(elm, 'model_elm_heart.joblib')
-joblib.dump(encoder, 'encoder_elm_heart.joblib')
-print("✅ Model ELM berhasil disimpan!")
-
-"""HASIL WEB
-
-https://kkmmfkxy66fu2hwjfxlsmn.streamlit.app/
-
-contoh input data tidak beresiko
-| Fitur                                     | Nilai     |
-| ----------------------------------------- | --------- |
-| **Umur**                                  | 35        |
-| **Jenis Kelamin**                         | Perempuan |
-| **Tipe Nyeri Dada (0–3)**                 | 0         |
-| **Tekanan Darah (mmHg)**                  | 120       |
-| **Kolesterol (mg/dl)**                    | 180       |
-| **Gula Darah > 120 mg/dl (1=Ya,0=Tidak)** | 0         |
-| **Hasil ECG (0–2)**                       | 0         |
-| **Denyut Jantung Maksimum**               | 170       |
-| **Angina karena olahraga (1=Ya,0=Tidak)** | 0         |
-| **ST Depression**                         | 0.0       |
-| **Slope ST (0–2)**                        | 1         |
-| **Jumlah pembuluh besar (0–4)**           | 0         |
-| **Thalassemia (0–3)**                     | 2         |
-
-contoh beresiko
-| Fitur                                     | Nilai     |
-| ----------------------------------------- | --------- |
-| **Umur**                                  | 63        |
-| **Jenis Kelamin**                         | Laki-laki |
-| **Tipe Nyeri Dada (0–3)**                 | 3         |
-| **Tekanan Darah (mmHg)**                  | 150       |
-| **Kolesterol (mg/dl)**                    | 260       |
-| **Gula Darah > 120 mg/dl (1=Ya,0=Tidak)** | 1         |
-| **Hasil ECG (0–2)**                       | 2         |
-| **Denyut Jantung Maksimum**               | 120       |
-| **Angina karena olahraga (1=Ya,0=Tidak)** | 1         |
-| **ST Depression**                         | 3.5       |
-| **Slope ST (0–2)**                        | 0         |
-| **Jumlah pembuluh besar (0–4)**           | 2         |
-| **Thalassemia (0–3)**                     | 1         |
-"""
+st.success("Semua model berhasil disimpan!")

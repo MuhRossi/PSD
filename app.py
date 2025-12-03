@@ -127,7 +127,11 @@ Misalkan kita punya data kolom `age` dari 5 pasien:
 
 ### 1. Hitung Rata-rata (Mean)
 
-st.latex(r"\mu = \frac{63 + 59 + 55 + 54 + 65}{5} = 59.2")
+st.markdown(r"""
+$$
+\mu = \frac{63 + 59 + 55 + 54 + 65}{5} = 59.2
+$$
+""")
 
 ### 2. Hitung Standar Deviasi (σ)
 
